@@ -46,7 +46,7 @@ class LoginApp:
     def __init__(self, root):
         self.root = root
         root.title("Login")
-        root.geometry("380x260")
+        root.geometry("380x320")
         root.resizable(False, False)
 
         self.login_frame = tk.Frame(root)
@@ -80,6 +80,13 @@ class LoginApp:
             bg="#2d6cdf", fg="white", activebackground="#245bb5",
             padx=10, pady=6, command=self.attempt_login
         ).pack(pady=15)
+
+        # Shows exactly which keys.json this app is reading -
+        # if keygen.py shows a different path, that's why login fails.
+        tk.Label(
+            f, text=f"keys.json location:\n{KEYS_FILE}",
+            font=("Segoe UI", 8), fg="#666666", justify="center"
+        ).pack(pady=(0, 5))
 
     def build_success_frame(self):
         f = self.success_frame

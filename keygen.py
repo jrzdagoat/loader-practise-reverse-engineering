@@ -67,7 +67,7 @@ class KeyGenApp:
     def __init__(self, root):
         self.root = root
         root.title("Key Generator")
-        root.geometry("480x480")
+        root.geometry("480x520")
         root.resizable(False, False)
 
         tk.Label(root, text="Key Generator", font=("Segoe UI", 16, "bold")).pack(pady=(20, 10))
@@ -127,6 +127,13 @@ class KeyGenApp:
             btn_row, text="Refresh", padx=10, pady=4,
             command=self.refresh_list
         ).grid(row=0, column=2, padx=5)
+
+        # Shows exactly which keys.json this app is reading/writing -
+        # if login.py shows a different path, that's why keys don't match.
+        tk.Label(
+            root, text=f"keys.json location:\n{KEYS_FILE}",
+            font=("Segoe UI", 8), fg="#666666", justify="center"
+        ).pack(pady=(5, 10))
 
         self.current_key = None
         self.list_entries = []  # parallel list of usernames matching listbox rows
