@@ -3,9 +3,13 @@
 Two small desktop apps (Python + tkinter) that work together:
 
 ## Files
-- **keygen.py** — generates a key for a username and saves it to `keys.json`.
-- **login.py** — asks for a username + key, checks them against `keys.json`.
-  On a match it shows a **"Login Successful"** screen with a **Close** button.
+- **keygen.py** — generates a key for a username, saved to `keys.json`.
+  Also lists every existing username/key and lets you **Deactivate** or
+  **Reactivate** them.
+- **login.py** — asks for a username + key, checks them against
+  `keys.json`. On a valid, active match it shows a **"Login Successful"**
+  screen with a **Close** button. A deactivated key is rejected with
+  "This key has been deactivated."
 - **keys.json** — created automatically the first time you generate a key.
   Both apps must live in the same folder so they share this file.
 
@@ -25,6 +29,19 @@ Two small desktop apps (Python + tkinter) that work together:
    ```
    Enter the same username and key, click **Login**. On success you'll see
    **"Login Successful"** with a **Close** button.
+
+## Deactivating a key
+
+Open `keygen.py` — every username you've generated a key for shows up in
+the **Existing Keys** list along with its status (`ACTIVE` or
+`DEACTIVATED`). Click a row to select it, then:
+- **Deactivate** — the key stops working for login, but stays in
+  `keys.json` so you can turn it back on later.
+- **Reactivate** — turns a deactivated key back on.
+- **Refresh** — reloads the list (useful if `keys.json` changed on disk).
+
+Deactivating doesn't delete anything — it just flips a flag, so nothing
+is lost if you deactivate the wrong user by mistake.
 
 ## Turning it into .exe files via GitHub
 

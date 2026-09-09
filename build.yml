@@ -1,0 +1,56 @@
+name: Build Windows EXEs
+
+# Runs on every push to main, on pull requests, and can also be triggered
+# manually from the "Actions" tab in GitHub ("Run workflow" button).
+on:
+  push:
+    branches: [ "main" ]
+    tags: [ "v*" ]
+  pull_request:
+    branches: [ "main" ]
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: windows-latest
+
+    steps:
+      - name: Check out the repo
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install PyInstaller
+        run: pip install pyinstaller
+
+      - name: Build keygen.exe
+        run: pyinstaller --onefile --windowed --name keygen keygen.py
+
+      - name: Build login.exe
+        run: pyinstaller --onefile --windowed --name login login.py
+
+      # Uploads the two .exe files as a downloadable build artifact
+      # (visible on the workflow run page, under "Artifacts").
+      - name: Upload EXEs as artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: auth-app-windows-exes
+          path: |
+            dist/keygen.exe
+            dist/login.exe
+
+      # If this run was triggered by pushing a version tag (e.g. v1.0.0),
+      # also attach the .exe files to a GitHub Release automatically.
+      - name: Create GitHub Release with EXEs
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            dist/keygen.exe
+            dist/login.exe

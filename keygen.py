@@ -1,30 +1,55 @@
 """
 Key Generator
 -------------
-A standalone tool for generating login keys tied to a username.
-Generated keys are saved to keys.json, which the Login app reads
-to validate sign-ins.
+A standalone tool for generating login keys tied to a username, and for
+deactivating/reactivating keys later without deleting them.
+
+Keys are saved to keys.json, which the Login app reads to validate
+sign-ins. Each entry looks like:
+
+    {"username": {"key": "XXXX-XXXX-XXXX-XXXX", "active": true}}
 
 Run with:  python keygen.py
 """
 
 import json
 import os
+import sys
 import secrets
 import tkinter as tk
 from tkinter import messagebox
 
-KEYS_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "keys.json")
+# When PyInstaller bundles this into a --onefile .exe, __file__ points at a
+# temporary extraction folder that's deleted after the app closes - not the
+# actual .exe location. sys.executable is the real .exe path in that case,
+# so keys.json ends up saved next to the .exe itself and both apps can find it.
+if getattr(sys, "frozen", False):
+    APP_DIR = os.path.dirname(os.path.abspath(sys.executable))
+else:
+    APP_DIR = os.path.dirname(os.path.abspath(__file__))
+
+KEYS_FILE = os.path.join(APP_DIR, "keys.json")
 
 
 def load_keys():
-    if os.path.exists(KEYS_FILE):
-        try:
-            with open(KEYS_FILE, "r") as f:
-                return json.load(f)
-        except (json.JSONDecodeError, OSError):
-            return {}
-    return {}
+    if not os.path.exists(KEYS_FILE):
+        return {}
+    try:
+        with open(KEYS_FILE, "r") as f:
+            data = json.load(f)
+    except (json.JSONDecodeError, OSError):
+        return {}
+
+    # Upgrade any old-format entries (plain string keys) to the new
+    # {"key": ..., "active": true} shape so old keys.json files still work.
+    changed = False
+    for username, value in list(data.items()):
+        if isinstance(value, str):
+            data[username] = {"key": value, "active": True}
+            changed = True
+    if changed:
+        save_keys(data)
+    return data
 
 
 def save_keys(data):
@@ -42,7 +67,7 @@ class KeyGenApp:
     def __init__(self, root):
         self.root = root
         root.title("Key Generator")
-        root.geometry("420x260")
+        root.geometry("480x480")
         root.resizable(False, False)
 
         tk.Label(root, text="Key Generator", font=("Segoe UI", 16, "bold")).pack(pady=(20, 10))
@@ -58,18 +83,54 @@ class KeyGenApp:
             root, text="Generate Key", font=("Segoe UI", 11, "bold"),
             bg="#2d6cdf", fg="white", activebackground="#245bb5",
             padx=10, pady=6, command=self.on_generate
-        ).pack(pady=10)
+        ).pack(pady=8)
 
         self.result_var = tk.StringVar(value="")
-        self.result_label = tk.Label(
-            root, textvariable=self.result_var, font=("Consolas", 13, "bold"),
-            fg="#1a7f37"
-        )
-        self.result_label.pack(pady=(5, 0))
+        tk.Label(
+            root, textvariable=self.result_var, font=("Consolas", 12, "bold"), fg="#1a7f37"
+        ).pack(pady=(0, 4))
 
-        tk.Button(root, text="Copy Key", command=self.copy_key).pack(pady=8)
+        tk.Button(root, text="Copy Key", command=self.copy_key).pack(pady=(0, 15))
+
+        # --- Existing keys list ---
+        tk.Label(root, text="Existing Keys", font=("Segoe UI", 12, "bold")).pack(pady=(0, 5))
+
+        list_frame = tk.Frame(root)
+        list_frame.pack(fill="both", expand=True, padx=20)
+
+        scrollbar = tk.Scrollbar(list_frame)
+        scrollbar.pack(side="right", fill="y")
+
+        self.listbox = tk.Listbox(
+            list_frame, font=("Consolas", 10), height=8,
+            yscrollcommand=scrollbar.set, selectmode="single"
+        )
+        self.listbox.pack(side="left", fill="both", expand=True)
+        scrollbar.config(command=self.listbox.yview)
+
+        btn_row = tk.Frame(root)
+        btn_row.pack(pady=10)
+
+        tk.Button(
+            btn_row, text="Deactivate", bg="#c0392b", fg="white",
+            activebackground="#a5311f", padx=10, pady=4,
+            command=self.deactivate_selected
+        ).grid(row=0, column=0, padx=5)
+
+        tk.Button(
+            btn_row, text="Reactivate", bg="#1a7f37", fg="white",
+            activebackground="#166a2e", padx=10, pady=4,
+            command=self.reactivate_selected
+        ).grid(row=0, column=1, padx=5)
+
+        tk.Button(
+            btn_row, text="Refresh", padx=10, pady=4,
+            command=self.refresh_list
+        ).grid(row=0, column=2, padx=5)
 
         self.current_key = None
+        self.list_entries = []  # parallel list of usernames matching listbox rows
+        self.refresh_list()
 
     def on_generate(self):
         username = self.username_entry.get().strip()
@@ -79,12 +140,13 @@ class KeyGenApp:
 
         keys = load_keys()
         new_key = generate_key()
-        keys[username] = new_key
+        keys[username] = {"key": new_key, "active": True}
         save_keys(keys)
 
         self.current_key = new_key
         self.result_var.set(f"{username} -> {new_key}")
         messagebox.showinfo("Key generated", f"Key created for '{username}'.\nSaved to keys.json.")
+        self.refresh_list()
 
     def copy_key(self):
         if not self.current_key:
@@ -93,6 +155,43 @@ class KeyGenApp:
         self.root.clipboard_clear()
         self.root.clipboard_append(self.current_key)
         messagebox.showinfo("Copied", "Key copied to clipboard.")
+
+    def refresh_list(self):
+        keys = load_keys()
+        self.listbox.delete(0, "end")
+        self.list_entries = []
+        for username in sorted(keys.keys()):
+            entry = keys[username]
+            status = "ACTIVE" if entry.get("active", True) else "DEACTIVATED"
+            self.listbox.insert("end", f"{username:<15} {entry.get('key', ''):<20} [{status}]")
+            self.list_entries.append(username)
+
+    def get_selected_username(self):
+        selection = self.listbox.curselection()
+        if not selection:
+            messagebox.showwarning("No selection", "Select a user from the list first.")
+            return None
+        return self.list_entries[selection[0]]
+
+    def deactivate_selected(self):
+        username = self.get_selected_username()
+        if not username:
+            return
+        keys = load_keys()
+        keys[username]["active"] = False
+        save_keys(keys)
+        messagebox.showinfo("Deactivated", f"Key for '{username}' has been deactivated.")
+        self.refresh_list()
+
+    def reactivate_selected(self):
+        username = self.get_selected_username()
+        if not username:
+            return
+        keys = load_keys()
+        keys[username]["active"] = True
+        save_keys(keys)
+        messagebox.showinfo("Reactivated", f"Key for '{username}' has been reactivated.")
+        self.refresh_list()
 
 
 if __name__ == "__main__":

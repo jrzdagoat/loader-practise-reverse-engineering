@@ -9,20 +9,37 @@ Run with:  python login.py
 
 import json
 import os
+import sys
 import tkinter as tk
 from tkinter import messagebox
 
-KEYS_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "keys.json")
+# See the matching comment in keygen.py: when frozen into a --onefile .exe,
+# __file__ points at a temp extraction folder, not the real .exe location.
+# Use sys.executable instead so both exes look next to themselves for
+# keys.json and actually share the same file.
+if getattr(sys, "frozen", False):
+    APP_DIR = os.path.dirname(os.path.abspath(sys.executable))
+else:
+    APP_DIR = os.path.dirname(os.path.abspath(__file__))
+
+KEYS_FILE = os.path.join(APP_DIR, "keys.json")
 
 
 def load_keys():
-    if os.path.exists(KEYS_FILE):
-        try:
-            with open(KEYS_FILE, "r") as f:
-                return json.load(f)
-        except (json.JSONDecodeError, OSError):
-            return {}
-    return {}
+    if not os.path.exists(KEYS_FILE):
+        return {}
+    try:
+        with open(KEYS_FILE, "r") as f:
+            data = json.load(f)
+    except (json.JSONDecodeError, OSError):
+        return {}
+
+    # Support old-format keys.json where values were plain strings
+    # (no active/deactivated concept yet) - treat those as active.
+    for username, value in data.items():
+        if isinstance(value, str):
+            data[username] = {"key": value, "active": True}
+    return data
 
 
 class LoginApp:
@@ -83,13 +100,15 @@ class LoginApp:
             return
 
         keys = load_keys()
-        expected = keys.get(username)
+        entry = keys.get(username)
 
-        if expected is not None and expected == key:
+        if entry is None or entry.get("key") != key:
+            self.error_var.set("Invalid username or key.")
+        elif not entry.get("active", True):
+            self.error_var.set("This key has been deactivated.")
+        else:
             self.login_frame.pack_forget()
             self.success_frame.pack(expand=True, fill="both")
-        else:
-            self.error_var.set("Invalid username or key.")
 
 
 if __name__ == "__main__":
