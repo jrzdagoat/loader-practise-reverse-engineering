@@ -1,0 +1,15 @@
+# PyInstaller build output
+build/
+dist/
+*.spec
+
+# Byte-compiled files
+__pycache__/
+*.pyc
+
+# The generated key store — don't commit real keys to the repo
+keys.json
+
+# OS / editor cruft
+.DS_Store
+.vscode/
